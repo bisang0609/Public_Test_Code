@@ -497,7 +497,7 @@ void Detector::detectLine(Mat& in, Mat& out)
    drawContours(out, validContours, -1, Scalar(255), cv::FILLED);
 #endif
 }
-
+#endif
 void Detector::detectDot(Mat& in, Mat& out) const
 {
 	// blur
@@ -556,7 +556,6 @@ void Detector::detectDot(Mat& in, Mat& out) const
 	}
 }
 
-#endif
 void Detector::detectAuto(Mat& src, Mat& dst) const
 {
     Mat srcLab;
