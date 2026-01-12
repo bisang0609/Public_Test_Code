@@ -266,6 +266,7 @@ void Detector::detectLine(Mat& in, Mat& out)
                     validContours.push_back(contours[i]);
                 }
 #else
+                /*
                 // 1. 컨투어를 감싸는 회전된 사각형을 구합니다. (기울어진 직선도 잡기 위해)
                 RotatedRect rotRect = minAreaRect(contours[i]);
                 float w = rotRect.size.width;
@@ -286,6 +287,79 @@ void Detector::detectLine(Mat& in, Mat& out)
                 // 3. (권장) isContourConvex 조건은 제거 (모양이 조금 찌그러져도 인식되게)
                 // ==========================================================
                 if (area >= mMinArea && area <= mMaxArea && !isLine)
+                {
+                    validContours.push_back(contours[i]);
+                }
+                */
+                /*
+                double perimeter = arcLength(contours[i], true); // 둘레 길이
+                double areaVal = contourArea(contours[i]);       // 면적
+
+                if (perimeter == 0) continue;
+
+                // 공식: 4 * pi * 면적 / (둘레)^2
+                // - 완벽한 원 = 1.0
+                // - 정사각형 = 약 0.78
+                // - 길쭉한 직선 = 0.4 이하로 뚝 떨어짐
+                double circularity = (4 * CV_PI * areaVal) / (perimeter * perimeter);
+
+                // [디버깅용] 값을 확인해 보세요!
+                // 1번(병변)과 2번(직선)의 circularity 값이 확연히 다를 것입니다.
+                 qDebug() << "Contour #" << i << " Circularity:" << circularity << " Area:" << areaVal;
+
+                // [필터링 기준]
+                // 0.5 보다 크면 '둥근 덩어리'로 간주 (직선은 보통 0.2~0.3 나옴)
+                // 만약 병변도 같이 사라지면 0.4로 낮추세요.
+                double Limi_Data = 0.35;
+                bool isRound = (circularity > Limi_Data);
+
+                // -----------------------------------------------------------------
+                // [최종 조건]
+                // 1. 크기 조건 만족
+                // 2. 둥근 형태일 것 (isRound)
+                // 3. (옵션) 볼록 조건(Convex)은 제거 권장
+                // -----------------------------------------------------------------
+                if (areaVal >= mMinArea && areaVal <= mMaxArea && isRound)
+                {
+                    validContours.push_back(contours[i]);
+                }
+                */
+                // -----------------------------------------------------------------
+                // [추가] 1. 사각형 필터링 (Rectangularity)
+                // -----------------------------------------------------------------
+                RotatedRect rotRect = minAreaRect(contours[i]);
+                double rectArea = rotRect.size.width * rotRect.size.height;
+                //double area = contourArea(contours[i]);
+
+                // 면적이 박스를 얼마나 채우는지 계산 (사각형이면 1.0에 가까움)
+                double rectangularity = (rectArea > 0) ? (area / rectArea) : 0;
+                bool isSquareShape = (rectangularity > 0.90); // 90% 이상 채우면 사각형 노이즈
+
+                // -----------------------------------------------------------------
+                // [추가] 2. 단순 도형 필터링 (Vertex Count)
+                // -----------------------------------------------------------------
+                // approxPolyDP 결과(_contour)의 점 개수가 적으면 인공적인 도형일 확률 높음
+                bool isSimplePoly = (_contour.size() <= 6);
+
+                // -----------------------------------------------------------------
+                // [기존] 원형도 계산 (사용자 설정값 0.35)
+                // -----------------------------------------------------------------
+                double perimeter = arcLength(contours[i], true);
+                double circularity = (perimeter > 0) ? (4 * CV_PI * area) / (perimeter * perimeter) : 0;
+                double Limi_Data = 0.30;
+                bool isRound = (circularity > Limi_Data);
+
+                // -----------------------------------------------------------------
+                // [최종 조건]
+                // 1. 크기 만족
+                // 2. 원형도 만족 (isRound)
+                // 3. 사각형이 아닐 것 (!isSquareShape)
+                // 4. 단순 도형이 아닐 것 (!isSimplePoly) -> 필요시 주석 처리하며 조절
+                // -----------------------------------------------------------------
+                if (area >= mMinArea && area <= mMaxArea
+                    && isRound
+                    && !isSquareShape
+                    && !isSimplePoly)
                 {
                     validContours.push_back(contours[i]);
                 }
