@@ -4,6 +4,8 @@
 #include <QDir>
 #include <QCoreApplication>
 
+#include <opencv2/imgproc.hpp>
+
 using namespace OtaNervus;
 using namespace std;
 using namespace cv;
@@ -208,6 +210,91 @@ void Detector::save_dbg_img(const cv::Mat& img, const char* tag, int index)
     cv::imwrite(filename.toStdString(), img);
 }
 
+#if 1
+//#include <opencv2/imgproc.hpp>
+
+// 예: 띠 높이보다 큰 값(단위: 픽셀), 상황에 따라 조정하세요.
+static const int kTophatKernelLen = 90;
+static const int kCloseKernelLen  = 40;
+
+void Detector::detectLine(Mat& in, Mat& out)
+{
+    save_dbg_img(in, "in", 1);
+
+    // 1. 블러 -> 그레이 변환
+    cv::Mat blur;
+    GaussianBlur(in, blur, cv::Size(0, 0), mSigma);
+
+    cv::Mat gray;
+    cvtColor(blur, gray, cv::COLOR_RGB2GRAY);
+
+    // 2. white‑tophat 전처리로 세로 띠 제거
+    cv::Mat vertKernel = cv::getStructuringElement(cv::MORPH_RECT,
+                                                   cv::Size(1, kTophatKernelLen));
+    cv::Mat opened, tophat;
+    cv::morphologyEx(gray, opened, cv::MORPH_OPEN, vertKernel);
+    tophat = gray - opened;
+    save_dbg_img(tophat, "tophat", 2);
+
+    // 3. 적응형 이진화 (tophat 이미지를 사용)
+    cv::Mat bin;
+    cv::adaptiveThreshold(tophat, bin, 255,
+                          cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV,
+                          mBlock, mC);
+    save_dbg_img(bin, "bin", 3);
+
+    // 4. 기본 모폴로지 연산 (노이즈 제거)
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                                               cv::Size(mKernel, mKernel));
+    cv::dilate(bin, bin, kernel, cv::Point(-1, -1), 2);
+    cv::erode(bin, bin, kernel, cv::Point(-1, -1), 2);
+
+    // 5. 클로징으로 띠로 끊어진 경계 연결
+    cv::Mat closeKernel = cv::getStructuringElement(cv::MORPH_RECT,
+                                                    cv::Size(kCloseKernelLen, 1));
+    cv::morphologyEx(bin, bin, cv::MORPH_CLOSE, closeKernel,
+                     cv::Point(-1, -1), 1);
+
+    // 6. 컨투어 추출 및 필터링 (기존 로직 유지)
+    std::vector<std::vector<cv::Point>> contours;
+    std::vector<cv::Vec4i> hierarchy;
+    cv::findContours(bin, contours, hierarchy, cv::RETR_CCOMP,
+                     cv::CHAIN_APPROX_SIMPLE, cv::Point(mRoi.x, mRoi.y));
+
+    out = cv::Mat::zeros(in.size(), CV_8UC1);
+    if (!contours.empty() && !hierarchy.empty())
+    {
+        std::vector<std::vector<cv::Point>> validContours;
+        for (size_t i = 0; i < contours.size(); ++i)
+        {
+            if (hierarchy[i][3] < 0)
+            {
+                double area = cv::contourArea(contours[i]);
+                if (!isValidContour(in, contours[i]))
+                    continue;
+
+                // 세로 띠(길쭉한 직사각형) 제외
+                cv::RotatedRect rotRect = cv::minAreaRect(contours[i]);
+                float w = rotRect.size.width;
+                float h = rotRect.size.height;
+                float ratio = (w < h) ? (w / h) : (h / w);
+                bool isVerticalStripe = (ratio < 0.25f);
+
+                // 기존 면적/원형도/사각형 필터링...
+                // (필요하면 기존 조건들을 그대로 추가하세요)
+
+                if (area >= mMinArea && area <= mMaxArea && !isVerticalStripe)
+                {
+                    validContours.push_back(contours[i]);
+                }
+            }
+        }
+        cv::drawContours(out, validContours, -1, cv::Scalar(255),
+                         cv::FILLED);
+    }
+}
+
+#else
 void Detector::detectLine(Mat& in, Mat& out)
 {
     save_dbg_img(in, "in",1);
@@ -219,7 +306,6 @@ void Detector::detectLine(Mat& in, Mat& out)
 
     // gray scale
     Mat gray;
-
     cvtColor(blur, gray, COLOR_RGB2GRAY);
     save_dbg_img(gray, "gray",3);
 
@@ -470,7 +556,7 @@ void Detector::detectDot(Mat& in, Mat& out) const
 	}
 }
 
-
+#endif
 void Detector::detectAuto(Mat& src, Mat& dst) const
 {
     Mat srcLab;
