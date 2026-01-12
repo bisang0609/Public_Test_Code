@@ -91,6 +91,7 @@ signals:
     void drawMultipleGuide(std::vector<cv::Point>, int);
     void imageProcessingOk(std::vector<cv::Point>);
     void sig_binImage(const cv::Mat& bin); // bin 영상 전달용 시그널 추가
+    void sig_laserImage(const cv::Mat& img); // [추가] 레이저 가이드(녹색선) 영상 시그널
 };
 
 #endif // IMAGEPROCESSOR_H

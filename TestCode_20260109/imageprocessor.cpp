@@ -486,7 +486,11 @@ void ImageProcessor::doCalibration(cv::Mat& _in)
         return;
 
     Point _laserPostion = detectorLaserGuide.getLaserPosition(_in, _bin);
-
+#ifdef ADD_VIEW
+    if (!_bin.empty()) {
+        emit sig_laserImage(_bin);
+    }
+#endif
     if (isValidPostion(_laserPostion))
     {
         agentCuRAS->setCalibration(false);

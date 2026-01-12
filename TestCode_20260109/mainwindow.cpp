@@ -25,6 +25,11 @@ MainWindow::MainWindow(QWidget *parent) :
     m_binWin->setWindowTitle("Binary Monitor");
     m_binWin->setFixedSize(480, 480);
     m_binWin->show();
+
+    m_laserWin = new QLabel(nullptr, Qt::Window);
+    m_laserWin->setWindowTitle("Laser Guide Monitor (Green Line)");
+    m_laserWin->setFixedSize(480, 480);
+    m_laserWin->show();
 #endif
 #if 0   // 20221007 JYH Append
     connect(imageProcessor, SIGNAL(SIG_setImage(unsigned, unsigned, unsigned char*)), this, SLOT(SLT_displayImage(unsigned, unsigned, unsigned char*)), Qt::DirectConnection);
@@ -65,6 +70,20 @@ MainWindow::MainWindow(QWidget *parent) :
             // 그레이스케일 포맷으로 변환하여 새 창에 출력
             QImage qImg(resizedBin.data, resizedBin.cols, resizedBin.rows, resizedBin.step, QImage::Format_Grayscale8);
             m_binWin->setPixmap(QPixmap::fromImage(qImg));
+        });
+        connect(imageProcessor, &ImageProcessor::sig_laserImage, this, [=](const cv::Mat& img){
+            if(img.empty()) return;
+
+            // 이미지 리사이즈 (240x240 -> 480x480)
+            cv::Mat resizedImg;
+            cv::resize(img, resizedImg, cv::Size(480, 480));
+
+            // OpenCV(BGR) -> Qt(RGB) 변환
+            // _bin 이미지는 원본 위에 그려진 컬러 이미지이므로 BGR2RGB 변환 필요
+            cv::cvtColor(resizedImg, resizedImg, cv::COLOR_BGR2RGB);
+
+            QImage qImg(resizedImg.data, resizedImg.cols, resizedImg.rows, resizedImg.step, QImage::Format_RGB888);
+            m_laserWin->setPixmap(QPixmap::fromImage(qImg));
         });
     }
 #endif
