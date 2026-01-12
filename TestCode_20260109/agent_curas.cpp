@@ -161,12 +161,12 @@ void AgentCuRAS::doHandpiecePacket(uint8_t* _buffer, uint16_t _size)
             if(_packet.Parameter == 1 && context.OpMode == READY)
             {
                 context.touchDetect = 0;
-                qDebug() << "Read Touch OFF";
+                //qDebug() << "Read Touch OFF";
             }
             else if(_packet.Parameter == 0 && context.OpMode == READY)
             {
                 context.touchDetect = 1;
-                qDebug() << "Read Touch ON";
+                //qDebug() << "Read Touch ON";
             }
 #else
             context.touchDetect = _packet.Parameter;
@@ -222,12 +222,12 @@ void AgentCuRAS::doHandpiecePacket(uint8_t* _buffer, uint16_t _size)
                         Old_OPMode = context.OpMode;
                         if(Old_OPMode == STANDBY)
                         {
-                            qDebug() << "AUTO STANDBY";
+                            //qDebug() << "AUTO STANDBY";
                             context.touchDetect = 0;
                         }
                         else if(Old_OPMode == READY)
                         {
-                            qDebug() << "AUTO READY";
+                            //qDebug() << "AUTO READY";
                             context.touchDetect = 1;
                         }
                     }

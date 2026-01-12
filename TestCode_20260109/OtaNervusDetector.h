@@ -3,6 +3,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <QDir>
+#include "agent_curas.h"
 
 namespace OtaNervus {
 	class Detector;
@@ -51,6 +52,7 @@ public:
 	void setMinArea(int minArea) { mMinArea = minArea; }
 	void setMaxArea(int maxArea) { mMaxArea = maxArea; }
 	void setDotKernel(int kernel) { mDotKernel = kernel; }
+    Mat getBinMat() { return m_bin; }
 
 protected:
     void detectLine(cv::Mat& in, cv::Mat& out);
@@ -59,7 +61,7 @@ protected:
     //void save_dbg_img(const cv::Mat& img, const char* tag);
     void save_dbg_img(const cv::Mat& img, const char* tag, int index);
     QDir DBGsavePathDir;
-
+    cv::Mat m_bin;
 private:
     cv::Mat referenceImg;
     std::vector<cv::Mat> referenceChannel;

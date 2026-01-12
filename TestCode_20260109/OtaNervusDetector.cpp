@@ -177,8 +177,10 @@ void Detector::detectLine(Mat& in, Mat& out)
     // threshold
 	Mat bin;
     adaptiveThreshold(gray, bin, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, mBlock, mC);
-     save_dbg_img(bin, "bin",4);
-
+    save_dbg_img(bin, "bin",4);
+#ifdef ADD_VIEW
+    m_bin = bin.clone();
+#endif
 	// erode & dilate
     Mat kernel = getStructuringElement(MORPH_ELLIPSE, Size(mKernel, mKernel));
     dilate(bin, bin, kernel, Point(-1, -1), 2);

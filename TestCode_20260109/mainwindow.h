@@ -6,7 +6,7 @@
 
 #include "agent_curas.h"
 #include "imageprocessor.h"
-
+#include "DebugWindow.h"
 namespace Ui {
 class MainWindow;
 }
@@ -68,6 +68,7 @@ private:
 
     AgentCuRAS* agentCuRAS;
     ImageProcessor* imageProcessor;
+    QLabel* m_binWin; // 별도의 창으로 사용할 라벨
 };
 
 #endif // MAINWINDOW_H

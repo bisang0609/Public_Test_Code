@@ -5,7 +5,7 @@
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgcodecs.hpp"
-
+#include "agent_curas.h"
 using namespace std;
 
 
@@ -165,10 +165,16 @@ void ImageProcessor::sendImageProcessingOk(vector<Point> _points)
 
 void ImageProcessor::doDetect(cv::Mat& _in, cv::Mat& _out)
 {
+#ifdef ADD_VIEW
+    cv::Mat bin;
+#endif
     switch (agentCuRAS->getShotMode())
     {
     case SEMIAUTO_WHITE:
         detectorWhite.detect(_in, _out);
+#ifdef ADD_VIEW
+        bin = detectorWhite.getBinMat();
+#endif
         break;
     case SEMIAUTO_GV:
         detectorGV.detect(_in, _out);
@@ -177,6 +183,11 @@ void ImageProcessor::doDetect(cv::Mat& _in, cv::Mat& _out)
         detectorAUTO.detect(_in, _out);
         break;
     }
+#ifdef ADD_VIEW
+    if (!bin.empty()) {
+        emit sig_binImage(bin);
+    }
+#endif
 }
 
 

@@ -19,7 +19,13 @@ MainWindow::MainWindow(QWidget *parent) :
     imageProcessor = new ImageProcessor(agentCuRAS);
 
     ui->OSD->setCuRAS(agentCuRAS);
-
+#ifdef ADD_VIEW
+    // 1. 새 창 설정 (480x480)
+    m_binWin = new QLabel(nullptr, Qt::Window);
+    m_binWin->setWindowTitle("Binary Monitor");
+    m_binWin->setFixedSize(480, 480);
+    m_binWin->show();
+#endif
 #if 0   // 20221007 JYH Append
     connect(imageProcessor, SIGNAL(SIG_setImage(unsigned, unsigned, unsigned char*)), this, SLOT(SLT_displayImage(unsigned, unsigned, unsigned char*)), Qt::DirectConnection);
 #else
@@ -44,7 +50,24 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->lbl_tip_progress->setVisible(false);
     ui->lbl_EEPROMConnectTXT->setVisible(false);
     /* ========== EEPROM Tip JYH Append ========================================  */
+    // 2. ImageProcessor의 시그널 연결
+#ifdef ADD_VIEW
+    if (imageProcessor)
+    {
+        connect(imageProcessor, &ImageProcessor::sig_binImage, this, [=](const cv::Mat& bin)
+        {
+            if(bin.empty()) return;
 
+            cv::Mat resizedBin;
+            // 240x240 영상을 480x480으로 확대
+            cv::resize(bin, resizedBin, cv::Size(480, 480));
+
+            // 그레이스케일 포맷으로 변환하여 새 창에 출력
+            QImage qImg(resizedBin.data, resizedBin.cols, resizedBin.rows, resizedBin.step, QImage::Format_Grayscale8);
+            m_binWin->setPixmap(QPixmap::fromImage(qImg));
+        });
+    }
+#endif
     imageProcessor->start();
 }
 

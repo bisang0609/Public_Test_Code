@@ -90,6 +90,7 @@ signals:
     void drawMultipleGuide(std::vector<cv::Point>);
     void drawMultipleGuide(std::vector<cv::Point>, int);
     void imageProcessingOk(std::vector<cv::Point>);
+    void sig_binImage(const cv::Mat& bin); // bin 영상 전달용 시그널 추가
 };
 
 #endif // IMAGEPROCESSOR_H

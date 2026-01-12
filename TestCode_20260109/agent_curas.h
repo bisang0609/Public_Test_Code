@@ -17,7 +17,8 @@ using namespace std;
 using namespace cv;
 
 #define DISABLE_USART
-#define DISABLE_TOUCH
+//#define DISABLE_TOUCH
+#define ADD_VIEW
 
 #pragma pack(push, 1)
 typedef struct {
