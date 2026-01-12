@@ -301,10 +301,38 @@ void Detector::detectLine(Mat& in, Mat& out)
     // 6. 컨투어 추출 및 필터링 (기존 로직 유지)
     std::vector<std::vector<cv::Point>> contours;
     std::vector<cv::Vec4i> hierarchy;
+
     cv::findContours(bin, contours, hierarchy, cv::RETR_CCOMP,
                      cv::CHAIN_APPROX_SIMPLE, cv::Point(mRoi.x, mRoi.y));
-
     out = cv::Mat::zeros(in.size(), CV_8UC1);
+    std::vector<std::vector<cv::Point>> validContours;
+    for (size_t i = 0; i < contours.size(); ++i)
+    {
+        double area = cv::contourArea(contours[i]);
+        double areaRatio = area / (in.cols * in.rows);  // 전체 화면 대비 비율
+
+        // 화면 대부분을 덮는 컨투어(예: 90% 이상)는 배경이므로 건너뜁니다.
+        /*
+        if (areaRatio > 0.9)
+            continue;
+        */
+        if (!isValidContour(in, contours[i]))
+            continue;
+
+        // 세로 줄 여부 판단
+        cv::RotatedRect rotRect = cv::minAreaRect(contours[i]);
+        float w = rotRect.size.width;
+        float h = rotRect.size.height;
+        float ratio = (w < h) ? (w / h) : (h / w);
+        bool isVerticalStripe = (ratio < 0.25f);
+
+        // 면적과 비율 조건 검사
+        if (area >= mMinArea && area <= mMaxArea && !isVerticalStripe) {
+            validContours.push_back(contours[i]);
+        }
+    }
+    cv::drawContours(out, validContours, -1, cv::Scalar(255), cv::FILLED);
+    /*
     if (!contours.empty() && !hierarchy.empty())
     {
         std::vector<std::vector<cv::Point>> validContours;
@@ -333,9 +361,11 @@ void Detector::detectLine(Mat& in, Mat& out)
                 }
             }
         }
+
         cv::drawContours(out, validContours, -1, cv::Scalar(255),
                          cv::FILLED);
     }
+    */
 }
 
 void Detector::detectDot(Mat& in, Mat& out) const
