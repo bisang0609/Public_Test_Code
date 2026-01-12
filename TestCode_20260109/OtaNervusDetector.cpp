@@ -25,6 +25,53 @@ Detector::Detector()
      * 영상의 잔영(비치는 영상)을 제거하기 위한
      * 레퍼런스 이미지
      */
+#ifdef ADD_VIEW
+    QString sPathSeparator = QString(QDir::separator());
+    QString sAppPath = QCoreApplication::applicationDirPath();
+
+    /***
+     * 1. [기존] AUTO 모드용 레퍼런스 이미지 로드 (reference2.jpg - 노란 배경)
+     */
+    if (referenceImg.empty())
+    {
+        String reference2 = (sAppPath + sPathSeparator + "reference2.jpg").toStdString();
+        referenceImg = cv::imread(reference2, IMREAD_COLOR);
+
+        if (!referenceImg.empty())
+        {
+            cv::cvtColor(referenceImg, referenceImg, cv::COLOR_BGR2Lab);
+            GaussianBlur(referenceImg, referenceImg, Size(0, 0), mSigma);
+            split(referenceImg, referenceChannel);
+        }
+    }
+
+    /***
+     * 2. [추가] SEMIAUTO 모드용 레퍼런스 이미지 로드 (reference_black.jpg - 검은 배경)
+     * 주의: 실행 파일 위치에 'reference_black.jpg' 파일이 있어야 합니다.
+     */
+    // referenceChannelBlack은 헤더파일에 새로 선언했다고 가정합니다.
+    if (referenceChannelBlack.empty())
+    {
+        // 파일 이름은 실제 저장한 파일명과 똑같이 맞춰주세요
+        String referenceBlackPath = (sAppPath + sPathSeparator + "reference_black.jpg").toStdString();
+        Mat referenceImgBlack = cv::imread(referenceBlackPath, IMREAD_COLOR);
+
+        if (!referenceImgBlack.empty())
+        {
+            // 1. Lab 변환
+            cv::cvtColor(referenceImgBlack, referenceImgBlack, cv::COLOR_BGR2Lab);
+
+            // 2. [중요/추가] 레퍼런스의 흰색 띠를 더 두껍게 만들기 (Dilation)
+            // 커널 사이즈(5,5)를 조절하여 두께를 정합니다. (클수록 많이 덮음)
+            Mat kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
+            dilate(referenceImgBlack, referenceImgBlack, kernel);
+
+            // 3. 블러링 및 채널 분리
+            GaussianBlur(referenceImgBlack, referenceImgBlack, Size(0, 0), mSigma);
+            split(referenceImgBlack, referenceChannelBlack);
+        }
+    }
+#else
     if (referenceImg.empty())
     {
         QString sPathSeparator = QString(QDir::separator());
@@ -36,6 +83,7 @@ Detector::Detector()
         GaussianBlur(referenceImg, referenceImg, Size(0, 0), mSigma);
         split(referenceImg, referenceChannel);
     }
+#endif
 }
 
 Detector::~Detector()
@@ -171,8 +219,10 @@ void Detector::detectLine(Mat& in, Mat& out)
 
     // gray scale
     Mat gray;
+
     cvtColor(blur, gray, COLOR_RGB2GRAY);
     save_dbg_img(gray, "gray",3);
+
 
     // threshold
 	Mat bin;
@@ -200,26 +250,46 @@ void Detector::detectLine(Mat& in, Mat& out)
         vector<vector<Point>> validContours;
         for (unsigned int i = 0; i < contours.size(); i++)
         {
-            //int child = hierarchy[i][2];  //20220615 JYH warning remove
             int parent = hierarchy[i][3];
-//            qDebug("child = %d, parent = %d",child, parent);
-
-            //if (child < 0 && parent < 0)
             if (parent < 0)
             {
                 double area = contourArea(contours[i]);
-
-//                qDebug("area = %f\n", area);
+                qDebug("area = %f\n", area);
                 if (!isValidContour(in, contours[i]))
                     continue;
 
                 vector<Point> _contour;
                 approxPolyDP(contours[i], _contour, 0.04*arcLength(contours[i], true), true);
-
+#if 0
                 if (area >= mMinArea && area <= mMaxArea && isContourConvex(_contour))
                 {
                     validContours.push_back(contours[i]);
                 }
+#else
+                // 1. 컨투어를 감싸는 회전된 사각형을 구합니다. (기울어진 직선도 잡기 위해)
+                RotatedRect rotRect = minAreaRect(contours[i]);
+                float w = rotRect.size.width;
+                float h = rotRect.size.height;
+                // 2. 비율 계산 (0.0 ~ 1.0 사이 값)
+                // 값이 0에 가까울수록 "매우 얇고 긴 직선"입니다.
+                // 값이 1에 가까울수록 "정사각형이나 원"에 가깝습니다.
+                float ratio = (w < h) ? (w / h) : (h / w);
+
+                // 3. 직선 판정 기준 (Threshold)
+                // 0.2 미만이면(두께가 길이의 20% 미만) 직선으로 간주하고 버립니다.
+                // 병변이 길쭉하다면 이 값을 0.15 정도로 낮추고, 직선이 두껍다면 0.25로 높이세요.
+                bool isLine = (ratio < 0.25);
+                // ==========================================================
+                // [조건 수정]
+                // 1. 크기 조건 만족 (area)
+                // 2. 직선이 아니어야 함 (!isLine)
+                // 3. (권장) isContourConvex 조건은 제거 (모양이 조금 찌그러져도 인식되게)
+                // ==========================================================
+                if (area >= mMinArea && area <= mMaxArea && !isLine)
+                {
+                    validContours.push_back(contours[i]);
+                }
+#endif
             }
         }
         drawContours(out, validContours, -1, Scalar(255), cv::FILLED);

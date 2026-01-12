@@ -305,6 +305,36 @@ void ImageProcessor::doImageProcessing(cv::Mat& _in, cv::Mat& _out)
         #ifdef QT_DEBUG
                 OtaNervus::Util::drawBinaryContours(_in, _bin, _out, cv::Scalar(0, 255, 0), 2);
         #endif
+#ifdef ADD_VIEW
+                if (!_bin.empty())
+                {
+                    cv::Mat binColor;
+                    cv::Mat combinedImg;
+
+                    // 1. 이진화 이미지(_bin)는 흑백이므로, 녹색 선을 그리기 위해 컬러(BGR)로 변환
+                    cv::cvtColor(_bin, binColor, cv::COLOR_GRAY2BGR);
+
+                    // 2. 변환된 binColor를 '배경(in)'으로 넣고 그 위에 녹색 선을 그림
+                    //    (두 번째 인자 _bin은 컨투어 추출용 데이터)
+                    OtaNervus::Util::drawBinaryContours(binColor, _bin, combinedImg, cv::Scalar(0, 255, 0), 2);
+
+                    // 3. 합쳐진 이미지를 레이저 모니터 창으로 전송
+                    emit sig_laserImage(combinedImg);
+
+                    // (선택 사항) 만약 Binary Monitor 창이 따로 필요 없다면
+                    // emit sig_binImage(_bin); 부분은 주석 처리하거나 지우셔도 됩니다.
+                }
+                /*
+                {
+                    cv::Mat debugGreen;
+                    // _in(원본)에 _bin(검출영역)을 녹색(0,255,0)으로 그려서 debugGreen에 저장
+                    OtaNervus::Util::drawBinaryContours(_in, _bin, debugGreen, cv::Scalar(0, 255, 0), 2);
+
+                    // 3. 새 창으로 전송 (이전에 만든 sig_laserImage 재사용)
+                    emit sig_laserImage(debugGreen);
+                }
+                */
+#endif
                 points = OtaNervus::Util::getTargetPotisions(_bin, agentCuRAS->getSpotRadiusSize());
                 break;
             }
@@ -486,11 +516,6 @@ void ImageProcessor::doCalibration(cv::Mat& _in)
         return;
 
     Point _laserPostion = detectorLaserGuide.getLaserPosition(_in, _bin);
-#ifdef ADD_VIEW
-    if (!_bin.empty()) {
-        emit sig_laserImage(_bin);
-    }
-#endif
     if (isValidPostion(_laserPostion))
     {
         agentCuRAS->setCalibration(false);
