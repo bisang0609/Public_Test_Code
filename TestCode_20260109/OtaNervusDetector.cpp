@@ -128,7 +128,55 @@ bool less_by_x(const cv::Point& lhs, const cv::Point& rhs)
 
 #define SCREEN_AREA 35000
 
+#if 1
+bool Detector::isValidContour(cv::Mat src, std::vector<cv::Point> _contour) const
+{
+    // 컨투어의 좌/우, 상/하 최소‧최대 좌표
+    auto minmaxX = std::minmax_element(_contour.begin(), _contour.end(), less_by_x);
+    auto minmaxY = std::minmax_element(_contour.begin(), _contour.end(), less_by_y);
 
+    // 경계 접촉 여부
+    bool touchesLeftRight = (minmaxX.first->x <= 2 ||
+                             minmaxX.second->x >= src.cols - 2);
+    bool touchesTopBottom = (minmaxY.first->y <= 2 ||
+                             minmaxY.second->y >= src.rows - 2);
+
+    if (mShape == Shape::LINE) {
+        // LINE 모드에서는 전체 영상 면적 대비 비율을 사용하여 작은 병변을 허용
+        double area_ratio = (double)cv::contourArea(_contour) /
+                            (src.cols * src.rows) * 100.0;
+        const double boundaryThreshold = 30.0; // 경계 접촉 시 최소 면적 비율 (%)
+
+        // 하나라도 경계에 닿고 면적 비율이 작으면 무시
+        if ((touchesLeftRight || touchesTopBottom) &&
+            area_ratio < boundaryThreshold) {
+            return false;
+        }
+        // 좌우와 상하 모두 닿는 경우(거의 전체 화면)는 제외
+        //if (touchesLeftRight && touchesTopBottom) {
+        //   return false;
+        //}
+    } else {
+        // 다른 모드(DOT/AUTO)에서는 기존 조건을 유지
+        double area_ratio = cv::contourArea(_contour) / SCREEN_AREA * 100.0;
+
+        if (minmaxX.first->x <= 2 || minmaxX.second->x >= src.cols - 2) {
+            if (area_ratio < 30.0)  // 전체 면적의 30% 미만이면 제외
+                return false;
+        }
+        if (minmaxY.first->y <= 2 || minmaxY.second->y >= src.rows - 2) {
+            if (area_ratio < 30.0)
+                return false;
+        }
+        if (minmaxX.first->x <= 2 && minmaxX.second->x >= src.cols - 2 &&
+            minmaxY.first->y <= 2 && minmaxY.second->y >= src.rows - 2) {
+            return false;
+        }
+    }
+    return true;
+}
+
+#else
 bool Detector::isValidContour(Mat src, vector<Point> _contour) const
 {
     auto minmaxX = minmax_element(_contour.begin(), _contour.end(), less_by_x);
@@ -156,7 +204,7 @@ bool Detector::isValidContour(Mat src, vector<Point> _contour) const
 
     return true;
 }
-
+#endif
 bool Detector::isTarget(Mat& in, std::vector<std::vector<cv::Point>>& conts, int idx)
 {
     Mat mask = cv::Mat::zeros(in.size(), CV_8UC1);
@@ -210,13 +258,9 @@ void Detector::save_dbg_img(const cv::Mat& img, const char* tag, int index)
     cv::imwrite(filename.toStdString(), img);
 }
 
-#if 1
-//#include <opencv2/imgproc.hpp>
-
 // 예: 띠 높이보다 큰 값(단위: 픽셀), 상황에 따라 조정하세요.
-static const int kTophatKernelLen = 90;
-static const int kCloseKernelLen  = 40;
-
+static const int kTophatKernelSize = 31;  // 타원형 커널 크기 (31×31)
+static const int kCloseKernelSize  = 15;  // 클로징 커널 크기  (15×15)
 void Detector::detectLine(Mat& in, Mat& out)
 {
     save_dbg_img(in, "in", 1);
@@ -229,20 +273,21 @@ void Detector::detectLine(Mat& in, Mat& out)
     cvtColor(blur, gray, cv::COLOR_RGB2GRAY);
 
     // 2. white‑tophat 전처리로 세로 띠 제거
-    cv::Mat vertKernel = cv::getStructuringElement(cv::MORPH_RECT,
-                                                   cv::Size(1, kTophatKernelLen));
-    cv::Mat opened, tophat;
-    cv::morphologyEx(gray, opened, cv::MORPH_OPEN, vertKernel);
+    Mat ellKernel = getStructuringElement(MORPH_ELLIPSE,
+                                          Size(kTophatKernelSize, kTophatKernelSize));
+    Mat opened, tophat;
+    morphologyEx(gray, opened, MORPH_OPEN, ellKernel);
     tophat = gray - opened;
     save_dbg_img(tophat, "tophat", 2);
-
     // 3. 적응형 이진화 (tophat 이미지를 사용)
     cv::Mat bin;
     cv::adaptiveThreshold(tophat, bin, 255,
                           cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV,
                           mBlock, mC);
     save_dbg_img(bin, "bin", 3);
-
+#ifdef ADD_VIEW
+    m_bin = bin.clone();
+#endif
     // 4. 기본 모폴로지 연산 (노이즈 제거)
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
                                                cv::Size(mKernel, mKernel));
@@ -250,11 +295,9 @@ void Detector::detectLine(Mat& in, Mat& out)
     cv::erode(bin, bin, kernel, cv::Point(-1, -1), 2);
 
     // 5. 클로징으로 띠로 끊어진 경계 연결
-    cv::Mat closeKernel = cv::getStructuringElement(cv::MORPH_RECT,
-                                                    cv::Size(kCloseKernelLen, 1));
-    cv::morphologyEx(bin, bin, cv::MORPH_CLOSE, closeKernel,
-                     cv::Point(-1, -1), 1);
-
+    Mat closeKernel = getStructuringElement(MORPH_ELLIPSE,
+                                            Size(kCloseKernelSize, kCloseKernelSize));
+    morphologyEx(bin, bin, MORPH_CLOSE, closeKernel, Point(-1,-1), 2);
     // 6. 컨투어 추출 및 필터링 (기존 로직 유지)
     std::vector<std::vector<cv::Point>> contours;
     std::vector<cv::Vec4i> hierarchy;
@@ -279,10 +322,11 @@ void Detector::detectLine(Mat& in, Mat& out)
                 float h = rotRect.size.height;
                 float ratio = (w < h) ? (w / h) : (h / w);
                 bool isVerticalStripe = (ratio < 0.25f);
-
+                //bool isVerticalStripe = (ratio < 0.1f);
                 // 기존 면적/원형도/사각형 필터링...
                 // (필요하면 기존 조건들을 그대로 추가하세요)
-
+                qDebug() << "Contour area:" << area << " ratio:" << ratio
+                         << " verticalStripe:" << isVerticalStripe;
                 if (area >= mMinArea && area <= mMaxArea && !isVerticalStripe)
                 {
                     validContours.push_back(contours[i]);
@@ -294,210 +338,6 @@ void Detector::detectLine(Mat& in, Mat& out)
     }
 }
 
-#else
-void Detector::detectLine(Mat& in, Mat& out)
-{
-    save_dbg_img(in, "in",1);
-
-    // blur
-    Mat blur;
-    GaussianBlur(in, blur, Size(0, 0), mSigma);
-    save_dbg_img(blur, "blur",2);
-
-    // gray scale
-    Mat gray;
-    cvtColor(blur, gray, COLOR_RGB2GRAY);
-    save_dbg_img(gray, "gray",3);
-
-
-    // threshold
-	Mat bin;
-    adaptiveThreshold(gray, bin, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, mBlock, mC);
-    save_dbg_img(bin, "bin",4);
-#ifdef ADD_VIEW
-    m_bin = bin.clone();
-#endif
-	// erode & dilate
-    Mat kernel = getStructuringElement(MORPH_ELLIPSE, Size(mKernel, mKernel));
-    dilate(bin, bin, kernel, Point(-1, -1), 2);
-    erode(bin, bin, kernel, Point(-1, -1), 2);
-    //save_dbg_img(kernel, "kernel-erode");
-   // result
-#if 1
-    // find contours
-    vector<vector<Point>> contours;
-    vector<Vec4i> hierarchy;
-    findContours(bin, contours, hierarchy, RETR_CCOMP, CHAIN_APPROX_SIMPLE, Point(mRoi.x, mRoi.y));
-
-    // result
-    out = Mat::zeros(in.size(), CV_8UC1);
-    if (contours.size() && hierarchy.size())
-    {
-        vector<vector<Point>> validContours;
-        for (unsigned int i = 0; i < contours.size(); i++)
-        {
-            int parent = hierarchy[i][3];
-            if (parent < 0)
-            {
-                double area = contourArea(contours[i]);
-                qDebug("area = %f\n", area);
-                if (!isValidContour(in, contours[i]))
-                    continue;
-
-                vector<Point> _contour;
-                approxPolyDP(contours[i], _contour, 0.04*arcLength(contours[i], true), true);
-#if 0
-                if (area >= mMinArea && area <= mMaxArea && isContourConvex(_contour))
-                {
-                    validContours.push_back(contours[i]);
-                }
-#else
-                /*
-                // 1. 컨투어를 감싸는 회전된 사각형을 구합니다. (기울어진 직선도 잡기 위해)
-                RotatedRect rotRect = minAreaRect(contours[i]);
-                float w = rotRect.size.width;
-                float h = rotRect.size.height;
-                // 2. 비율 계산 (0.0 ~ 1.0 사이 값)
-                // 값이 0에 가까울수록 "매우 얇고 긴 직선"입니다.
-                // 값이 1에 가까울수록 "정사각형이나 원"에 가깝습니다.
-                float ratio = (w < h) ? (w / h) : (h / w);
-
-                // 3. 직선 판정 기준 (Threshold)
-                // 0.2 미만이면(두께가 길이의 20% 미만) 직선으로 간주하고 버립니다.
-                // 병변이 길쭉하다면 이 값을 0.15 정도로 낮추고, 직선이 두껍다면 0.25로 높이세요.
-                bool isLine = (ratio < 0.25);
-                // ==========================================================
-                // [조건 수정]
-                // 1. 크기 조건 만족 (area)
-                // 2. 직선이 아니어야 함 (!isLine)
-                // 3. (권장) isContourConvex 조건은 제거 (모양이 조금 찌그러져도 인식되게)
-                // ==========================================================
-                if (area >= mMinArea && area <= mMaxArea && !isLine)
-                {
-                    validContours.push_back(contours[i]);
-                }
-                */
-                /*
-                double perimeter = arcLength(contours[i], true); // 둘레 길이
-                double areaVal = contourArea(contours[i]);       // 면적
-
-                if (perimeter == 0) continue;
-
-                // 공식: 4 * pi * 면적 / (둘레)^2
-                // - 완벽한 원 = 1.0
-                // - 정사각형 = 약 0.78
-                // - 길쭉한 직선 = 0.4 이하로 뚝 떨어짐
-                double circularity = (4 * CV_PI * areaVal) / (perimeter * perimeter);
-
-                // [디버깅용] 값을 확인해 보세요!
-                // 1번(병변)과 2번(직선)의 circularity 값이 확연히 다를 것입니다.
-                 qDebug() << "Contour #" << i << " Circularity:" << circularity << " Area:" << areaVal;
-
-                // [필터링 기준]
-                // 0.5 보다 크면 '둥근 덩어리'로 간주 (직선은 보통 0.2~0.3 나옴)
-                // 만약 병변도 같이 사라지면 0.4로 낮추세요.
-                double Limi_Data = 0.35;
-                bool isRound = (circularity > Limi_Data);
-
-                // -----------------------------------------------------------------
-                // [최종 조건]
-                // 1. 크기 조건 만족
-                // 2. 둥근 형태일 것 (isRound)
-                // 3. (옵션) 볼록 조건(Convex)은 제거 권장
-                // -----------------------------------------------------------------
-                if (areaVal >= mMinArea && areaVal <= mMaxArea && isRound)
-                {
-                    validContours.push_back(contours[i]);
-                }
-                */
-                // -----------------------------------------------------------------
-                // [추가] 1. 사각형 필터링 (Rectangularity)
-                // -----------------------------------------------------------------
-                RotatedRect rotRect = minAreaRect(contours[i]);
-                double rectArea = rotRect.size.width * rotRect.size.height;
-                //double area = contourArea(contours[i]);
-
-                // 면적이 박스를 얼마나 채우는지 계산 (사각형이면 1.0에 가까움)
-                double rectangularity = (rectArea > 0) ? (area / rectArea) : 0;
-                bool isSquareShape = (rectangularity > 0.90); // 90% 이상 채우면 사각형 노이즈
-
-                // -----------------------------------------------------------------
-                // [추가] 2. 단순 도형 필터링 (Vertex Count)
-                // -----------------------------------------------------------------
-                // approxPolyDP 결과(_contour)의 점 개수가 적으면 인공적인 도형일 확률 높음
-                bool isSimplePoly = (_contour.size() <= 6);
-
-                // -----------------------------------------------------------------
-                // [기존] 원형도 계산 (사용자 설정값 0.35)
-                // -----------------------------------------------------------------
-                double perimeter = arcLength(contours[i], true);
-                double circularity = (perimeter > 0) ? (4 * CV_PI * area) / (perimeter * perimeter) : 0;
-                double Limi_Data = 0.30;
-                bool isRound = (circularity > Limi_Data);
-
-                // -----------------------------------------------------------------
-                // [최종 조건]
-                // 1. 크기 만족
-                // 2. 원형도 만족 (isRound)
-                // 3. 사각형이 아닐 것 (!isSquareShape)
-                // 4. 단순 도형이 아닐 것 (!isSimplePoly) -> 필요시 주석 처리하며 조절
-                // -----------------------------------------------------------------
-                if (area >= mMinArea && area <= mMaxArea
-                    && isRound
-                    && !isSquareShape
-                    && !isSimplePoly)
-                {
-                    validContours.push_back(contours[i]);
-                }
-#endif
-            }
-        }
-        drawContours(out, validContours, -1, Scalar(255), cv::FILLED);
-    }
-
-#else
-   out = Mat::zeros(in.size(), CV_8UC1);
-   vector<vector<Point>> validContours;
-   for (int step = 0; step < 2; step++) {
-      vector<vector<Point>> contours;
-      vector<Vec4i> hierarchy;
-      int out_thick = 3;
-      if (step) {
-         rectangle(bin, Point(0, 0), Point(bin.size().width, bin.size().height), Scalar(255), out_thick);
-      }
-
-      // find contours
-      findContours(bin, contours, hierarchy, RETR_CCOMP, CHAIN_APPROX_SIMPLE, Point(mRoi.x, mRoi.y));
-
-      if (contours.size() && hierarchy.size()) {
-         for (int i = 0; i < contours.size(); i++) {
-            int child = hierarchy[i][2];
-            int parent = hierarchy[i][3];
-            if (child < 0 && parent >= 0) {
-               double area = contourArea(contours[i]);
-               if (area >= mMinArea && area <= mMaxArea) {
-                  if (!step) {
-                     validContours.push_back(contours[i]);
-                  }
-                  else {
-                     Rect br = boundingRect(contours[i]);
-                     if (br.width < bin.size().width - out_thick && br.height < bin.size().height - out_thick) {
-                        validContours.push_back(contours[i]);
-                     }
-                  }
-               }
-            }
-         }
-      }
-      if (validContours.size() > 0) {
-         break;
-      }
-   }
-
-   drawContours(out, validContours, -1, Scalar(255), cv::FILLED);
-#endif
-}
-#endif
 void Detector::detectDot(Mat& in, Mat& out) const
 {
 	// blur
