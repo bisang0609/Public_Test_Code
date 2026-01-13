@@ -128,7 +128,7 @@ bool less_by_x(const cv::Point& lhs, const cv::Point& rhs)
 
 #define SCREEN_AREA 35000
 
-#if 1
+#if 0
 bool Detector::isValidContour(cv::Mat src, std::vector<cv::Point> _contour) const
 {
     // 컨투어의 좌/우, 상/하 최소‧최대 좌표
@@ -289,11 +289,48 @@ void Detector::detectLine(Mat& in, Mat& out)
     m_bin = bin.clone();
 #endif
     // 4. 기본 모폴로지 연산 (노이즈 제거)
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-                                               cv::Size(mKernel, mKernel));
-    cv::dilate(bin, bin, kernel, cv::Point(-1, -1), 2);
-    cv::erode(bin, bin, kernel, cv::Point(-1, -1), 2);
+    Mat kernel = cv::getStructuringElement(MORPH_ELLIPSE,
+                                               Size(mKernel, mKernel));
+    dilate(bin, bin, kernel, Point(-1, -1), 2);
+    erode(bin, bin, kernel, Point(-1, -1), 2);
+#if 1
+    vector<vector<Point>> contours;
+    vector<Vec4i> hierarchy;
+    findContours(bin, contours, hierarchy, RETR_CCOMP, CHAIN_APPROX_SIMPLE, Point(mRoi.x, mRoi.y));
 
+    // result
+    out = Mat::zeros(in.size(), CV_8UC1);
+    if (contours.size() && hierarchy.size())
+    {
+        vector<vector<Point>> validContours;
+        for (unsigned int i = 0; i < contours.size(); i++)
+        {
+            //int child = hierarchy[i][2];  //20220615 JYH warning remove
+            int parent = hierarchy[i][3];
+            //            qDebug("child = %d, parent = %d",child, parent);
+
+            //if (child < 0 && parent < 0)
+            qDebug("parent = %d", parent);
+            if (parent < 0)  //?
+            {
+                double area = contourArea(contours[i]);
+
+                //                qDebug("area = %f\n", area);
+                if (!isValidContour(in, contours[i]))
+                    continue;
+
+                vector<Point> _contour;
+                approxPolyDP(contours[i], _contour, 0.04*arcLength(contours[i], true), true);
+
+                if (area >= mMinArea && area <= mMaxArea && isContourConvex(_contour))
+                {
+                    validContours.push_back(contours[i]);
+                }
+            }
+        }
+        drawContours(out, validContours, -1, Scalar(255), cv::FILLED);
+    }
+#else
     // 5. 클로징으로 띠로 끊어진 경계 연결
     Mat closeKernel = getStructuringElement(MORPH_ELLIPSE,
                                             Size(kCloseKernelSize, kCloseKernelSize));
@@ -312,10 +349,10 @@ void Detector::detectLine(Mat& in, Mat& out)
         double areaRatio = area / (in.cols * in.rows);  // 전체 화면 대비 비율
 
         // 화면 대부분을 덮는 컨투어(예: 90% 이상)는 배경이므로 건너뜁니다.
-        /*
+
         if (areaRatio > 0.9)
             continue;
-        */
+
         if (!isValidContour(in, contours[i]))
             continue;
 
@@ -327,45 +364,13 @@ void Detector::detectLine(Mat& in, Mat& out)
         bool isVerticalStripe = (ratio < 0.25f);
 
         // 면적과 비율 조건 검사
-        if (area >= mMinArea && area <= mMaxArea && !isVerticalStripe) {
+        if (area >= mMinArea && area <= mMaxArea && !isVerticalStripe)
+        {
             validContours.push_back(contours[i]);
         }
     }
-    cv::drawContours(out, validContours, -1, cv::Scalar(255), cv::FILLED);
-    /*
-    if (!contours.empty() && !hierarchy.empty())
-    {
-        std::vector<std::vector<cv::Point>> validContours;
-        for (size_t i = 0; i < contours.size(); ++i)
-        {
-            if (hierarchy[i][3] < 0)
-            {
-                double area = cv::contourArea(contours[i]);
-                if (!isValidContour(in, contours[i]))
-                    continue;
-
-                // 세로 띠(길쭉한 직사각형) 제외
-                cv::RotatedRect rotRect = cv::minAreaRect(contours[i]);
-                float w = rotRect.size.width;
-                float h = rotRect.size.height;
-                float ratio = (w < h) ? (w / h) : (h / w);
-                bool isVerticalStripe = (ratio < 0.25f);
-                //bool isVerticalStripe = (ratio < 0.1f);
-                // 기존 면적/원형도/사각형 필터링...
-                // (필요하면 기존 조건들을 그대로 추가하세요)
-                qDebug() << "Contour area:" << area << " ratio:" << ratio
-                         << " verticalStripe:" << isVerticalStripe;
-                if (area >= mMinArea && area <= mMaxArea && !isVerticalStripe)
-                {
-                    validContours.push_back(contours[i]);
-                }
-            }
-        }
-
-        cv::drawContours(out, validContours, -1, cv::Scalar(255),
-                         cv::FILLED);
-    }
-    */
+    drawContours(out, validContours, -1, cv::Scalar(255), cv::FILLED);
+#endif
 }
 
 void Detector::detectDot(Mat& in, Mat& out) const
