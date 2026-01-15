@@ -27,53 +27,7 @@ Detector::Detector()
      * 영상의 잔영(비치는 영상)을 제거하기 위한
      * 레퍼런스 이미지
      */
-#ifdef ADD_VIEW
-    QString sPathSeparator = QString(QDir::separator());
-    QString sAppPath = QCoreApplication::applicationDirPath();
 
-    /***
-     * 1. [기존] AUTO 모드용 레퍼런스 이미지 로드 (reference2.jpg - 노란 배경)
-     */
-    if (referenceImg.empty())
-    {
-        String reference2 = (sAppPath + sPathSeparator + "reference2.jpg").toStdString();
-        referenceImg = cv::imread(reference2, IMREAD_COLOR);
-
-        if (!referenceImg.empty())
-        {
-            cv::cvtColor(referenceImg, referenceImg, cv::COLOR_BGR2Lab);
-            GaussianBlur(referenceImg, referenceImg, Size(0, 0), mSigma);
-            split(referenceImg, referenceChannel);
-        }
-    }
-
-    /***
-     * 2. [추가] SEMIAUTO 모드용 레퍼런스 이미지 로드 (reference_black.jpg - 검은 배경)
-     * 주의: 실행 파일 위치에 'reference_black.jpg' 파일이 있어야 합니다.
-     */
-    // referenceChannelBlack은 헤더파일에 새로 선언했다고 가정합니다.
-    if (referenceChannelBlack.empty())
-    {
-        // 파일 이름은 실제 저장한 파일명과 똑같이 맞춰주세요
-        String referenceBlackPath = (sAppPath + sPathSeparator + "reference_black.jpg").toStdString();
-        Mat referenceImgBlack = cv::imread(referenceBlackPath, IMREAD_COLOR);
-
-        if (!referenceImgBlack.empty())
-        {
-            // 1. Lab 변환
-            cv::cvtColor(referenceImgBlack, referenceImgBlack, cv::COLOR_BGR2Lab);
-
-            // 2. [중요/추가] 레퍼런스의 흰색 띠를 더 두껍게 만들기 (Dilation)
-            // 커널 사이즈(5,5)를 조절하여 두께를 정합니다. (클수록 많이 덮음)
-            Mat kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
-            dilate(referenceImgBlack, referenceImgBlack, kernel);
-
-            // 3. 블러링 및 채널 분리
-            GaussianBlur(referenceImgBlack, referenceImgBlack, Size(0, 0), mSigma);
-            split(referenceImgBlack, referenceChannelBlack);
-        }
-    }
-#else
     if (referenceImg.empty())
     {
         QString sPathSeparator = QString(QDir::separator());
@@ -85,7 +39,6 @@ Detector::Detector()
         GaussianBlur(referenceImg, referenceImg, Size(0, 0), mSigma);
         split(referenceImg, referenceChannel);
     }
-#endif
 }
 
 Detector::~Detector()
@@ -128,55 +81,6 @@ bool less_by_x(const cv::Point& lhs, const cv::Point& rhs)
 
 #define SCREEN_AREA 35000
 
-#if 0
-bool Detector::isValidContour(cv::Mat src, std::vector<cv::Point> _contour) const
-{
-    // 컨투어의 좌/우, 상/하 최소‧최대 좌표
-    auto minmaxX = std::minmax_element(_contour.begin(), _contour.end(), less_by_x);
-    auto minmaxY = std::minmax_element(_contour.begin(), _contour.end(), less_by_y);
-
-    // 경계 접촉 여부
-    bool touchesLeftRight = (minmaxX.first->x <= 2 ||
-                             minmaxX.second->x >= src.cols - 2);
-    bool touchesTopBottom = (minmaxY.first->y <= 2 ||
-                             minmaxY.second->y >= src.rows - 2);
-
-    if (mShape == Shape::LINE) {
-        // LINE 모드에서는 전체 영상 면적 대비 비율을 사용하여 작은 병변을 허용
-        double area_ratio = (double)cv::contourArea(_contour) /
-                            (src.cols * src.rows) * 100.0;
-        const double boundaryThreshold = 30.0; // 경계 접촉 시 최소 면적 비율 (%)
-
-        // 하나라도 경계에 닿고 면적 비율이 작으면 무시
-        if ((touchesLeftRight || touchesTopBottom) &&
-            area_ratio < boundaryThreshold) {
-            return false;
-        }
-        // 좌우와 상하 모두 닿는 경우(거의 전체 화면)는 제외
-        //if (touchesLeftRight && touchesTopBottom) {
-        //   return false;
-        //}
-    } else {
-        // 다른 모드(DOT/AUTO)에서는 기존 조건을 유지
-        double area_ratio = cv::contourArea(_contour) / SCREEN_AREA * 100.0;
-
-        if (minmaxX.first->x <= 2 || minmaxX.second->x >= src.cols - 2) {
-            if (area_ratio < 30.0)  // 전체 면적의 30% 미만이면 제외
-                return false;
-        }
-        if (minmaxY.first->y <= 2 || minmaxY.second->y >= src.rows - 2) {
-            if (area_ratio < 30.0)
-                return false;
-        }
-        if (minmaxX.first->x <= 2 && minmaxX.second->x >= src.cols - 2 &&
-            minmaxY.first->y <= 2 && minmaxY.second->y >= src.rows - 2) {
-            return false;
-        }
-    }
-    return true;
-}
-
-#else
 bool Detector::isValidContour(Mat src, vector<Point> _contour) const
 {
     auto minmaxX = minmax_element(_contour.begin(), _contour.end(), less_by_x);
@@ -204,7 +108,7 @@ bool Detector::isValidContour(Mat src, vector<Point> _contour) const
 
     return true;
 }
-#endif
+
 bool Detector::isTarget(Mat& in, std::vector<std::vector<cv::Point>>& conts, int idx)
 {
     Mat mask = cv::Mat::zeros(in.size(), CV_8UC1);
