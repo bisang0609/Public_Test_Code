@@ -258,9 +258,19 @@ void Detector::save_dbg_img(const cv::Mat& img, const char* tag, int index)
     cv::imwrite(filename.toStdString(), img);
 }
 
+//Morphological Filtering
 // 예: 띠 높이보다 큰 값(단위: 픽셀), 상황에 따라 조정하세요.
-static const int kTophatKernelSize = 31;  // 타원형 커널 크기 (31×31)
-static const int kCloseKernelSize  = 15;  // 클로징 커널 크기  (15×15)
+// 구조 요소보다 작은 밝은 특징만 추출하고 두꺼운 밝은 띠는 제거
+// 커널 크기보다 좁은 밝은 윤곽선은 남고, 커널보다 굵은 반사광은 배경으로 간주되어 사라짐
+//static const int kTophatKernelSize = 31;  // 타원형 커널 크기 (31×31) //AIR
+static const int kTophatKernelSize = 25;
+
+
+// 구조 요소보다 좁은 간격은 메워져 하나의 영역으로 합쳐지고, 구조 요소보다 큰 간격은 그대로
+// 이 커널 크기를 키우면 끊어진 병변 경계가 더 멀리 떨어져 있어도 연결
+//static const int kCloseKernelSize  = 15;  // 클로징 커널 크기  (15×15) //AIR
+static const int kCloseKernelSize  = 15;  // 클로징 커널 크기  (15×15) //AIR
+
 void Detector::detectLine(Mat& in, Mat& out)
 {
     save_dbg_img(in, "in", 1);

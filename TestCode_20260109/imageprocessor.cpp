@@ -60,10 +60,10 @@ void ImageProcessor::initDetector(void)
      */
     detectorWhite.setShape(OtaNervus::Detector::Shape::LINE);
     detectorWhite.setColor(OtaNervus::Detector::Color::WHITE);
-    detectorWhite.setSigma(5);
-    detectorWhite.setBlock(95);
-    detectorWhite.setC(-2);
-    detectorWhite.setKernel(5);
+    detectorWhite.setSigma(5);  // 가우시안 블러 시그마 변경
+    detectorWhite.setBlock(95); //블록 크기 증가
+    detectorWhite.setC(-2); //상수 보정값 감소
+    detectorWhite.setKernel(5); //침식·팽창 커널 크기 변경
     detectorWhite.setMinArea(1000);
     detectorWhite.setMaxArea(40000);
 
