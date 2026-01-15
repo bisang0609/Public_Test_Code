@@ -19,17 +19,17 @@ MainWindow::MainWindow(QWidget *parent) :
     imageProcessor = new ImageProcessor(agentCuRAS);
 
     ui->OSD->setCuRAS(agentCuRAS);
-#ifdef QT_DEBUG
+#ifdef ADD_VIEW
     // 1. 새 창 설정 (480x480)
-    m_binWin = new QLabel(nullptr, Qt::Window | Qt::WindowStaysOnTopHint);
+    m_binWin = new QLabel(nullptr, Qt::Window);
     m_binWin->setWindowTitle("Binary Monitor");
     m_binWin->setFixedSize(480, 480);
     m_binWin->show();
 
-    //m_laserWin = new QLabel(nullptr, Qt::Window);
-    //m_laserWin->setWindowTitle("Laser Guide Monitor (Green Line)");
-    //m_laserWin->setFixedSize(480, 480);
-    //m_laserWin->show();
+    m_laserWin = new QLabel(nullptr, Qt::Window);
+    m_laserWin->setWindowTitle("Laser Guide Monitor (Green Line)");
+    m_laserWin->setFixedSize(480, 480);
+    m_laserWin->show();
 #endif
 #if 0   // 20221007 JYH Append
     connect(imageProcessor, SIGNAL(SIG_setImage(unsigned, unsigned, unsigned char*)), this, SLOT(SLT_displayImage(unsigned, unsigned, unsigned char*)), Qt::DirectConnection);
@@ -56,8 +56,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->lbl_EEPROMConnectTXT->setVisible(false);
     /* ========== EEPROM Tip JYH Append ========================================  */
     // 2. ImageProcessor의 시그널 연결
-#ifdef QT_DEBUG
-    /*
+#ifdef ADD_VIEW
     if (imageProcessor)
     {
         connect(imageProcessor, &ImageProcessor::sig_binImage, this, [=](const cv::Mat& bin)
@@ -86,24 +85,6 @@ MainWindow::MainWindow(QWidget *parent) :
             QImage qImg(resizedImg.data, resizedImg.cols, resizedImg.rows, resizedImg.step, QImage::Format_RGB888);
             m_laserWin->setPixmap(QPixmap::fromImage(qImg));
         });
-    }
-    */
-    if (imageProcessor) {
-        // 컬러(녹색 선) 이미지를 Binary Monitor로 표시
-        connect(imageProcessor, &ImageProcessor::sig_laserImage, this,
-                [=](const cv::Mat& img) {
-                    if (img.empty()) return;
-                    cv::Mat resizedImg;
-                    cv::resize(img, resizedImg, cv::Size(480, 480));
-                    // BGR → RGB 변환
-                    cv::cvtColor(resizedImg, resizedImg, cv::COLOR_BGR2RGB);
-                    QImage qImg(resizedImg.data, resizedImg.cols, resizedImg.rows,
-                                resizedImg.step, QImage::Format_RGB888);
-                    m_binWin->setPixmap(QPixmap::fromImage(qImg));
-                });
-
-        // 필요하지 않다면 순수한 바이너리 이미지를 표시하는 sig_binImage 연결은 삭제하거나 주석 처리합니다.
-        // connect(imageProcessor, &ImageProcessor::sig_binImage, ...);
     }
 #endif
     imageProcessor->start();

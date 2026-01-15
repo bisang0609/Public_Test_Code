@@ -60,7 +60,7 @@ void ImageProcessor::initDetector(void)
      */
     detectorWhite.setShape(OtaNervus::Detector::Shape::LINE);
     detectorWhite.setColor(OtaNervus::Detector::Color::WHITE);
-    detectorWhite.setSigma(5);  // 가우시안 블러 시그마 변경
+    detectorWhite.setSigma(5);
     detectorWhite.setBlock(95); //블록 크기 증가
     detectorWhite.setC(-2); //상수 보정값 감소
     detectorWhite.setKernel(5); //침식·팽창 커널 크기 변경
@@ -165,14 +165,14 @@ void ImageProcessor::sendImageProcessingOk(vector<Point> _points)
 
 void ImageProcessor::doDetect(cv::Mat& _in, cv::Mat& _out)
 {
-#ifdef QT_DEBUG
+#ifdef ADD_VIEW
     cv::Mat bin;
 #endif
     switch (agentCuRAS->getShotMode())
     {
     case SEMIAUTO_WHITE:
         detectorWhite.detect(_in, _out);
-#ifdef QT_DEBUG
+#ifdef ADD_VIEW
         bin = detectorWhite.getBinMat();
 #endif
         break;
@@ -181,9 +181,6 @@ void ImageProcessor::doDetect(cv::Mat& _in, cv::Mat& _out)
         break;
     case AUTO:
         detectorAUTO.detect(_in, _out);
-#ifdef QT_DEBUG
-        bin = detectorWhite.getBinMat();
-#endif
         break;
     }
 #ifdef ADD_VIEW
