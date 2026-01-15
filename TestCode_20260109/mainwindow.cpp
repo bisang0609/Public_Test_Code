@@ -21,12 +21,12 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->OSD->setCuRAS(agentCuRAS);
 #ifdef QT_DEBUG
     // 1. 새 창 설정 (480x480)
-   m_binWin = new QLabel(nullptr, Qt::Window | Qt::WindowStaysOnTopHint);
+    m_binWin = new QLabel(nullptr, Qt::Window | Qt::WindowStaysOnTopHint);
     m_binWin->setWindowTitle("Binary Monitor");
     m_binWin->setFixedSize(480, 480);
     m_binWin->show();
 
-    m_laserWin = new QLabel(nullptr, Qt::Window);
+    m_laserWin = new QLabel(nullptr, Qt::Window | Qt::WindowStaysOnTopHint);
     m_laserWin->setWindowTitle("Laser Guide Monitor (Green Line)");
     m_laserWin->setFixedSize(480, 480);
     m_laserWin->show();

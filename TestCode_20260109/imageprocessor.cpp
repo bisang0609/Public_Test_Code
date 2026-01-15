@@ -306,6 +306,7 @@ void ImageProcessor::doImageProcessing(cv::Mat& _in, cv::Mat& _out)
                 OtaNervus::Util::drawBinaryContours(_in, _bin, _out, cv::Scalar(0, 255, 0), 2);
         #endif
 #ifdef QT_DEBUG
+
                 if (!_bin.empty())
                 {
                     cv::Mat binColor;
@@ -319,11 +320,33 @@ void ImageProcessor::doImageProcessing(cv::Mat& _in, cv::Mat& _out)
                     OtaNervus::Util::drawBinaryContours(binColor, _bin, combinedImg, cv::Scalar(0, 255, 0), 2);
 
                     // 3. 합쳐진 이미지를 레이저 모니터 창으로 전송
-                    emit sig_laserImage(combinedImg);
+                    //emit sig_binImage(combinedImg);
 
                     // (선택 사항) 만약 Binary Monitor 창이 따로 필요 없다면
-                    // emit sig_binImage(_bin); 부분은 주석 처리하거나 지우셔도 됩니다.
+                    emit sig_laserImage(combinedImg);
                 }
+                /*
+                if (!_bin.empty())
+                {
+                    cv::Mat binDisplay;
+
+                    // 1. [배경] 이진화 영상(_bin)을 밝기 변경 없이 그대로 컬러로 변환
+                    //    (흰색 병변이 그대로 흰색으로 유지됨)
+                    if (_bin.channels() == 1) {
+                        cv::cvtColor(_bin, binDisplay, cv::COLOR_GRAY2BGR);
+                    } else {
+                        _bin.copyTo(binDisplay); // 만약 이미 3채널이라면 복사만 함
+                    }
+
+                    // 2. [그리기] 흰색 덩어리 테두리에 '녹색(Lime Green)' 외곽선 그리기
+                    cv::Mat finalImage;
+                    OtaNervus::Util::drawBinaryContours(binDisplay, _bin, finalImage, cv::Scalar(0, 255, 0), 2);
+
+                    // 3. [출력] 왼쪽(Bin)과 오른쪽(Laser) 모니터 모두에 전송
+                    //emit sig_binImage(finalImage);   // 왼쪽 창: 이진화 영상 + 라인
+                    emit sig_laserImage(finalImage); // 오른쪽 창: 동일하게 표시
+                }
+                */
 #endif
                 points = OtaNervus::Util::getTargetPotisions(_bin, agentCuRAS->getSpotRadiusSize());
                 break;
