@@ -58,7 +58,6 @@ protected:
     void detectLine(cv::Mat& in, cv::Mat& out);
     void detectDot(cv::Mat& in, cv::Mat& out) const;
     void detectAuto(cv::Mat& src, cv::Mat& dst) const;
-    //void save_dbg_img(const cv::Mat& img, const char* tag);
     void save_dbg_img(const cv::Mat& img, const char* tag, int index);
     QDir DBGsavePathDir;
     cv::Mat m_bin;

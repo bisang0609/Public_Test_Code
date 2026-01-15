@@ -165,14 +165,14 @@ void ImageProcessor::sendImageProcessingOk(vector<Point> _points)
 
 void ImageProcessor::doDetect(cv::Mat& _in, cv::Mat& _out)
 {
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
     cv::Mat bin;
 #endif
     switch (agentCuRAS->getShotMode())
     {
     case SEMIAUTO_WHITE:
         detectorWhite.detect(_in, _out);
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
         bin = detectorWhite.getBinMat();
 #endif
         break;
@@ -181,6 +181,9 @@ void ImageProcessor::doDetect(cv::Mat& _in, cv::Mat& _out)
         break;
     case AUTO:
         detectorAUTO.detect(_in, _out);
+#ifdef QT_DEBUG
+        bin = detectorWhite.getBinMat();
+#endif
         break;
     }
 #ifdef ADD_VIEW
