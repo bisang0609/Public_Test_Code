@@ -64,8 +64,7 @@ protected:
 private:
     cv::Mat referenceImg;
     std::vector<cv::Mat> referenceChannel;
-    // [추가] 변수 (SEMIAUTO 모드용 - 검은 배경)
-    std::vector<cv::Mat> referenceChannelBlack;
+
 
 	Shape mShape;
 	Color mColor;

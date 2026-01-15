@@ -69,7 +69,6 @@ private:
     AgentCuRAS* agentCuRAS;
     ImageProcessor* imageProcessor;
     QLabel* m_binWin; // 별도의 창으로 사용할 라벨
-    QLabel* m_laserWin; // [추가]: 레이저 가이드용 창
 };
 
 #endif // MAINWINDOW_H
