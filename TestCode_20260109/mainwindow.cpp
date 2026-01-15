@@ -19,9 +19,9 @@ MainWindow::MainWindow(QWidget *parent) :
     imageProcessor = new ImageProcessor(agentCuRAS);
 
     ui->OSD->setCuRAS(agentCuRAS);
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
     // 1. 새 창 설정 (480x480)
-    m_binWin = new QLabel(nullptr, Qt::Window);
+   m_binWin = new QLabel(nullptr, Qt::Window | Qt::WindowStaysOnTopHint);
     m_binWin->setWindowTitle("Binary Monitor");
     m_binWin->setFixedSize(480, 480);
     m_binWin->show();
@@ -56,7 +56,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->lbl_EEPROMConnectTXT->setVisible(false);
     /* ========== EEPROM Tip JYH Append ========================================  */
     // 2. ImageProcessor의 시그널 연결
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
     if (imageProcessor)
     {
         connect(imageProcessor, &ImageProcessor::sig_binImage, this, [=](const cv::Mat& bin)

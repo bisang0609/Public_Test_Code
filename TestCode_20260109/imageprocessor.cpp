@@ -165,14 +165,14 @@ void ImageProcessor::sendImageProcessingOk(vector<Point> _points)
 
 void ImageProcessor::doDetect(cv::Mat& _in, cv::Mat& _out)
 {
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
     cv::Mat bin;
 #endif
     switch (agentCuRAS->getShotMode())
     {
     case SEMIAUTO_WHITE:
         detectorWhite.detect(_in, _out);
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
         bin = detectorWhite.getBinMat();
 #endif
         break;
@@ -183,7 +183,7 @@ void ImageProcessor::doDetect(cv::Mat& _in, cv::Mat& _out)
         detectorAUTO.detect(_in, _out);
         break;
     }
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
     if (!bin.empty()) {
         emit sig_binImage(bin);
     }
@@ -305,7 +305,7 @@ void ImageProcessor::doImageProcessing(cv::Mat& _in, cv::Mat& _out)
         #ifdef QT_DEBUG
                 OtaNervus::Util::drawBinaryContours(_in, _bin, _out, cv::Scalar(0, 255, 0), 2);
         #endif
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
                 if (!_bin.empty())
                 {
                     cv::Mat binColor;
@@ -324,16 +324,6 @@ void ImageProcessor::doImageProcessing(cv::Mat& _in, cv::Mat& _out)
                     // (선택 사항) 만약 Binary Monitor 창이 따로 필요 없다면
                     // emit sig_binImage(_bin); 부분은 주석 처리하거나 지우셔도 됩니다.
                 }
-                /*
-                {
-                    cv::Mat debugGreen;
-                    // _in(원본)에 _bin(검출영역)을 녹색(0,255,0)으로 그려서 debugGreen에 저장
-                    OtaNervus::Util::drawBinaryContours(_in, _bin, debugGreen, cv::Scalar(0, 255, 0), 2);
-
-                    // 3. 새 창으로 전송 (이전에 만든 sig_laserImage 재사용)
-                    emit sig_laserImage(debugGreen);
-                }
-                */
 #endif
                 points = OtaNervus::Util::getTargetPotisions(_bin, agentCuRAS->getSpotRadiusSize());
                 break;

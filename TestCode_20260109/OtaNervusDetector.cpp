@@ -199,7 +199,7 @@ void Detector::detectLine(Mat& in, Mat& out)
                           cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV,
                           mBlock, mC);
     save_dbg_img(bin, "bin", 3);
-#ifdef ADD_VIEW
+#ifdef QT_DEBUG
     m_bin = bin.clone();
 #endif
     // 4. 기본 모폴로지 연산 (노이즈 제거)
